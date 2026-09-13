@@ -54,10 +54,12 @@ def test_dry_run_dia_de_sorte():
 
 def test_nome_favorito_usa_planilha_ou_flag():
     assert (
-        nome_favorito_padrao("~/Downloads/Lotofacil_163_apostas_otimizadas.csv")
+        nome_favorito_padrao(
+            "~/Downloads/Lotofacil_163_apostas_otimizadas.csv")
         == "Lotofacil_163_apostas_otimizadas"
     )
-    assert nome_favorito_padrao("jogos.csv", "  Meu Carrinho  ") == "Meu Carrinho"
+    assert nome_favorito_padrao(
+        "jogos.csv", "  Meu Carrinho  ") == "Meu Carrinho"
     assert nome_favorito_padrao("jogos.csv", "") == "jogos"
 
 
@@ -69,6 +71,80 @@ def test_sem_csv_mostra_ajuda(capsys):
     assert main([]) == 2
     err = capsys.readouterr().err
     assert "CSV" in err
+
+
+def test_dry_run_sem_csv_com_limite(tmp_path, capsys):
+    saida = tmp_path / "gerada.csv"
+    codigo = main(
+        [
+            "--modalidade",
+            "lotofacil",
+            "--limite",
+            "3",
+            "--config",
+            "15:3",
+            "--dry-run",
+            "--aceitar",
+            "--saida",
+            str(saida),
+        ]
+    )
+    assert codigo == 0
+    out = capsys.readouterr().out
+    assert "3 jogo(s) prontos" in out
+    assert "Simulação" in out
+    assert "Sumário" in out
+    assert saida.is_file()
+
+
+def test_dry_run_config_espacada_na_ordem(tmp_path, capsys):
+    saida = tmp_path / "ordem.csv"
+    codigo = main(
+        [
+            "--modalidade",
+            "lotofacil",
+            "--limite",
+            "5",
+            "--config",
+            "18:2",
+            "20:1",
+            "--dry-run",
+            "--aceitar",
+            "--saida",
+            str(saida),
+        ]
+    )
+    assert codigo == 0
+    out = capsys.readouterr().out
+    assert "5 jogo(s) prontos" in out
+    from caixa_apostas.csv_parser import ler_csv
+    from caixa_apostas.modalidades import obter_modalidade
+
+    jogos = ler_csv(saida, obter_modalidade("lotofacil")).jogos
+    assert [len(j.dezenas) for j in jogos] == [18, 18, 20, 15, 15]
+
+
+def test_dry_run_completa_planilha_com_aleatorios(tmp_path, capsys):
+    saida = tmp_path / "misto.csv"
+    codigo = main(
+        [
+            "exemplos/lotofacil.csv",
+            "--modalidade",
+            "lotofacil",
+            "--limite",
+            "4",
+            "--config",
+            "15:2",
+            "--dry-run",
+            "--aceitar",
+            "--saida",
+            str(saida),
+        ]
+    )
+    assert codigo == 0
+    out = capsys.readouterr().out
+    assert "4 jogo(s) prontos" in out
+    assert saida.is_file()
 
 
 def test_prompt_escolhe_por_numero():

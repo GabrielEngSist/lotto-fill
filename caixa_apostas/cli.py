@@ -9,10 +9,24 @@ from pathlib import Path
 from caixa_apostas import __version__
 from caixa_apostas.concurso import obter_info_concurso
 from caixa_apostas.cookies import carregar_cookies
-from caixa_apostas.csv_parser import ler_csv, validar_jogos
+from caixa_apostas.csv_parser import Jogo, escrever_csv, ler_csv, validar_jogos
 from caixa_apostas.favorito import nome_favorito_padrao
+from caixa_apostas.gerador import (
+    Configuracao,
+    GeradorError,
+    completar_ate_limite,
+    parse_configs,
+    pode_gerar,
+)
 from caixa_apostas.modalidades import Modalidade, listar_modalidades, obter_modalidade
 from caixa_apostas.navegador_cookies import buscar_cookies_navegador, listar_sessoes
+from caixa_apostas.simulador import (
+    chance_conjunto,
+    formatar_chance,
+    formatar_reais,
+    linha_simulacao,
+    simular_jogos,
+)
 
 
 def montar_parser() -> argparse.ArgumentParser:
@@ -26,7 +40,7 @@ def montar_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "csv",
         nargs="?",
-        help="arquivo CSV com colunas Jogo, D1, D2, …, DN, Numeros",
+        help="arquivo CSV com colunas Jogo, D1, D2, …, DN, Numeros (opcional se --limite)",
     )
     parser.add_argument(
         "-m",
@@ -78,7 +92,34 @@ def montar_parser() -> argparse.ArgumentParser:
         "--limite",
         type=int,
         default=0,
-        help="processar no máximo N jogos (0 = todos)",
+        help="total de jogos (completa com aleatórios se a planilha tiver menos; sem CSV gera todos)",
+    )
+    parser.add_argument(
+        "--config",
+        nargs="+",
+        action="append",
+        default=[],
+        metavar="DEZ:QTD",
+        help="jogos na ordem informada (ex.: --config 18:2 20:1). O restante até o limite usa a aposta simples.",
+    )
+    parser.add_argument(
+        "--saida",
+        help="CSV gerado após o aceite (padrão: apostas_<modalidade>_<n>jogos.csv)",
+    )
+    parser.add_argument(
+        "--aceitar",
+        action="store_true",
+        help="aceita a simulação sem perguntar",
+    )
+    parser.add_argument(
+        "--enviar-site",
+        action="store_true",
+        help="depois da planilha, envia os jogos ao carrinho",
+    )
+    parser.add_argument(
+        "--so-planilha",
+        action="store_true",
+        help="gera só a planilha, sem abrir o site",
     )
     parser.add_argument(
         "--headless",
@@ -163,6 +204,130 @@ def perguntar_cookie(input_fn=input) -> str:
         return input_fn("Cookie: ").strip()
     except (EOFError, KeyboardInterrupt):
         return ""
+
+
+def _perguntar_int(
+    prompt: str,
+    *,
+    minimo: int,
+    maximo: int,
+    padrao: int | None = None,
+    input_fn=input,
+) -> int:
+    sufixo = f" [{padrao}]" if padrao is not None else ""
+    while True:
+        bruto = input_fn(f"{prompt}{sufixo}: ").strip()
+        if not bruto and padrao is not None:
+            return padrao
+        if not bruto.lstrip("-").isdigit():
+            print(f"Informe um número entre {minimo} e {maximo}.")
+            continue
+        valor = int(bruto)
+        if minimo <= valor <= maximo:
+            return valor
+        print(f"Informe um número entre {minimo} e {maximo}.")
+
+
+def _perguntar_sim_nao(prompt: str, *, padrao: bool = False, input_fn=input) -> bool:
+    dica = "S/n" if padrao else "s/N"
+    bruto = input_fn(f"{prompt} [{dica}]: ").strip().lower()
+    if not bruto:
+        return padrao
+    return bruto in {"s", "sim", "y", "yes"}
+
+
+def _configs_da_flag(valores, modalidade: Modalidade) -> list[Configuracao]:
+    configs = parse_configs(valores or [])
+    for config in configs:
+        if not modalidade.min_dezenas <= config.dezenas <= modalidade.max_dezenas:
+            raise GeradorError(
+                f"{modalidade.nome} aceita {modalidade.min_dezenas}–"
+                f"{modalidade.max_dezenas} dezenas, veio {config.dezenas}"
+            )
+    return configs
+
+
+def perguntar_configuracoes(
+    modalidade: Modalidade,
+    restante: int,
+    input_fn=input,
+) -> list[Configuracao]:
+    configs: list[Configuracao] = []
+    falta = restante
+    while falta > 0:
+        print()
+        print(f"Faltam {falta} jogo(s) para completar o limite.")
+        dezenas = _perguntar_int(
+            f"Quantas dezenas ({modalidade.min_dezenas}–{modalidade.max_dezenas})",
+            minimo=modalidade.min_dezenas,
+            maximo=modalidade.max_dezenas,
+            padrao=modalidade.min_dezenas,
+            input_fn=input_fn,
+        )
+        qtd = _perguntar_int(
+            "Quantos jogos nessa configuração",
+            minimo=1,
+            maximo=falta,
+            padrao=falta,
+            input_fn=input_fn,
+        )
+        configs.append(Configuracao(dezenas, qtd))
+        falta -= qtd
+        if falta <= 0:
+            break
+        if not _perguntar_sim_nao("Mais alguma configuração?", input_fn=input_fn):
+            configs.append(Configuracao(dezenas, falta))
+            break
+    return configs
+
+
+def _resolver_configs(
+    modalidade: Modalidade,
+    restante: int,
+    args,
+    input_fn=input,
+) -> list[Configuracao]:
+    if restante <= 0:
+        return []
+    if args.config:
+        return _configs_da_flag(args.config, modalidade)
+    if sys.stdin.isatty():
+        return perguntar_configuracoes(modalidade, restante, input_fn=input_fn)
+    return [Configuracao(modalidade.min_dezenas, restante)]
+
+
+def _imprimir_simulacao(jogos: list[Jogo], modalidade: Modalidade) -> list:
+    resultados = simular_jogos(jogos, modalidade)
+    print()
+    print("Simulação (preço e probabilidade de cada volante)")
+    print("------------------------------------------------")
+    for i, resultado in enumerate(resultados, start=1):
+        print(linha_simulacao(i, resultado, modalidade))
+    return resultados
+
+
+def _imprimir_sumario(resultados, modalidade: Modalidade) -> None:
+    total = sum(item.preco for item in resultados)
+    p_premio = chance_conjunto([item.p_qualquer for item in resultados])
+    p_max = chance_conjunto([item.p_maximo for item in resultados])
+    print()
+    print("Sumário do conjunto")
+    print("-------------------")
+    print(f"Modalidade: {modalidade.nome}")
+    print(f"Jogos: {len(resultados)}")
+    print(f"Custo total: {formatar_reais(total)}")
+    print(f"Chance de pelo menos um prêmio: {formatar_chance(p_premio)}")
+    if resultados:
+        print(
+            f"Chance de pelo menos um {resultados[0].acertos_maximo} acertos: "
+            f"{formatar_chance(p_max)}"
+        )
+
+
+def _caminho_saida(args, modalidade: Modalidade, qtd: int, csv_path: Path | None) -> Path:
+    if args.saida:
+        return Path(args.saida)
+    return Path(f"apostas_{modalidade.chave}_{qtd}jogos.csv")
 
 
 def _listar_sessoes(navegador: str) -> int:
@@ -268,14 +433,16 @@ def main(argv: list[str] | None = None) -> int:
     if args.listar_sessoes:
         return _listar_sessoes(args.navegador)
 
-    if not args.csv:
-        parser.print_help()
-        print("\nErro: informe o arquivo CSV.", file=sys.stderr)
-        return 2
-
-    csv_path = Path(args.csv)
-    if not csv_path.is_file():
+    csv_path = Path(args.csv) if args.csv else None
+    if csv_path and not csv_path.is_file():
         print(f"CSV não encontrado: {csv_path}", file=sys.stderr)
+        return 2
+    if not csv_path and not args.limite and not args.apenas_salvar_favorito:
+        parser.print_help()
+        print("\nErro: informe o arquivo CSV ou --limite N.", file=sys.stderr)
+        return 2
+    if args.apenas_salvar_favorito and not csv_path:
+        print("Para --apenas-salvar-favorito informe o CSV (usado no nome do favorito).", file=sys.stderr)
         return 2
 
     try:
@@ -296,33 +463,92 @@ def main(argv: list[str] | None = None) -> int:
 
     _imprimir_concurso(modalidade)
 
-    leitura = ler_csv(csv_path, modalidade)
-    for aviso in leitura.avisos:
-        print(f"aviso: {aviso}")
-    for erro in leitura.erros:
-        print(f"erro de leitura: {erro}", file=sys.stderr)
+    validos: list[Jogo] = []
+    erros_validacao: list[str] = []
+    leitura_erros: list[str] = []
+    if csv_path:
+        leitura = ler_csv(csv_path, modalidade)
+        for aviso in leitura.avisos:
+            print(f"aviso: {aviso}")
+        for erro in leitura.erros:
+            print(f"erro de leitura: {erro}", file=sys.stderr)
+            leitura_erros.append(erro)
+        validos, erros_validacao = validar_jogos(leitura.jogos, modalidade)
+        for erro in erros_validacao:
+            print(f"jogo inválido: {erro}", file=sys.stderr)
 
-    validos, erros_validacao = validar_jogos(leitura.jogos, modalidade)
-    for erro in erros_validacao:
-        print(f"jogo inválido: {erro}", file=sys.stderr)
+    inicio = max(1, args.inicio)
+    da_planilha = validos[inicio - 1:]
+    if args.limite and args.limite > 0 and len(da_planilha) > args.limite:
+        da_planilha = da_planilha[: args.limite]
 
-    if not validos:
+    selecionados = list(da_planilha)
+    precisa_aleatorio = bool(args.limite) and len(selecionados) < args.limite
+    if not csv_path and args.limite:
+        precisa_aleatorio = True
+
+    if precisa_aleatorio:
+        if not pode_gerar(modalidade):
+            print(
+                f"{modalidade.nome} não tem gerador aleatório. "
+                "Informe um CSV completo.",
+                file=sys.stderr,
+            )
+            return 2
+        try:
+            restante = args.limite - len(selecionados)
+            configs = _resolver_configs(modalidade, restante, args)
+            selecionados = completar_ate_limite(
+                selecionados, modalidade, configs, args.limite
+            )
+        except GeradorError as exc:
+            print(exc, file=sys.stderr)
+            return 2
+
+    if not selecionados and not args.apenas_salvar_favorito:
         print("Nenhum jogo válido para enviar.", file=sys.stderr)
         return 1
 
-    inicio = max(1, args.inicio)
-    selecionados = validos[inicio - 1:]
-    if args.limite and args.limite > 0:
-        selecionados = selecionados[: args.limite]
-
     if not args.apenas_salvar_favorito:
         _imprimir_preview(selecionados, modalidade)
+        resultados = _imprimir_simulacao(selecionados, modalidade)
+        aceitou = args.aceitar or not sys.stdin.isatty()
+        if not aceitou:
+            aceitou = _perguntar_sim_nao(
+                "Aceita esta configuração e gera a planilha?", padrao=True
+            )
+        if not aceitou:
+            print("Configuração recusada. Nada foi gravado.")
+            return 1
+        _imprimir_sumario(resultados, modalidade)
+        gravar = bool(args.saida) or not args.dry_run or sys.stdin.isatty()
+        saida = None
+        if gravar:
+            saida = _caminho_saida(
+                args, modalidade, len(selecionados), csv_path)
+            escrever_csv(saida, selecionados, modalidade)
+            print(f"Planilha gravada em {saida}")
+            csv_path = saida
 
     if args.dry_run:
         print()
         print("Dry-run: nada foi enviado ao site.")
-        if erros_validacao or leitura.erros:
+        if erros_validacao or leitura_erros:
             return 1
+        return 0
+
+    enviar = False
+    if args.apenas_salvar_favorito:
+        enviar = True
+    elif args.enviar_site:
+        enviar = True
+    elif args.so_planilha:
+        enviar = False
+    elif sys.stdin.isatty():
+        enviar = _perguntar_sim_nao(
+            "Enviar os jogos ao carrinho do site agora?", padrao=False
+        )
+    if not enviar:
         return 0
 
     try:
@@ -342,7 +568,8 @@ def main(argv: list[str] | None = None) -> int:
 
     from caixa_apostas.browser import CaixaBrowser, Relatorio
 
-    nome_favorito = nome_favorito_padrao(csv_path, args.nome_favorito)
+    nome_favorito = nome_favorito_padrao(
+        csv_path or "carrinho", args.nome_favorito)
     salvar_favorito = not args.sem_salvar_favorito
     relatorio = Relatorio()
     erro_favorito = None

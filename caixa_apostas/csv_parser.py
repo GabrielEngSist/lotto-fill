@@ -60,7 +60,8 @@ def _para_int(valor: object) -> int | None:
     texto = str(valor).strip()
     if not texto:
         return None
-    texto = texto.replace(".0", "") if re.fullmatch(r"\d+\.0", texto) else texto
+    texto = texto.replace(".0", "") if re.fullmatch(
+        r"\d+\.0", texto) else texto
     if not re.fullmatch(r"-?\d+", texto):
         return None
     return int(texto)
@@ -91,7 +92,7 @@ def parse_numeros_concatenados(texto: str, largura: int) -> list[int]:
             f"string de números {bruto!r} tem {len(so_digitos)} dígitos, "
             f"não é múltiplo de {largura}"
         )
-    return [int(so_digitos[i : i + largura]) for i in range(0, len(so_digitos), largura)]
+    return [int(so_digitos[i: i + largura]) for i in range(0, len(so_digitos), largura)]
 
 
 def _colunas_d(cabecalho: list[str]) -> list[str]:
@@ -133,7 +134,8 @@ def _parse_lista_int(valor: object) -> list[int]:
     texto = str(valor).strip()
     if not texto:
         return []
-    partes = _SEP_NUMEROS.split(texto) if _SEP_NUMEROS.search(texto) else [texto]
+    partes = _SEP_NUMEROS.split(
+        texto) if _SEP_NUMEROS.search(texto) else [texto]
     saida: list[int] = []
     for parte in partes:
         parte = parte.strip().upper().lstrip("T").lstrip("TM")
@@ -267,7 +269,8 @@ def ler_csv_texto(
             if mes:
                 extras["mes"] = mes
             else:
-                avisos.append(f"linha {i}: mês inválido {linha.get(col_mes)!r}")
+                avisos.append(
+                    f"linha {i}: mês inválido {linha.get(col_mes)!r}")
         if col_time and linha.get(col_time):
             times = _parse_lista_int(linha.get(col_time))
             if times:
@@ -283,7 +286,8 @@ def ler_csv_texto(
         }:
             extras["espelho"] = True
         if col_loteca and linha.get(col_loteca) and "loteca" not in extras:
-            tokens = [p for p in _SEP_NUMEROS.split(str(linha.get(col_loteca))) if p]
+            tokens = [p for p in _SEP_NUMEROS.split(
+                str(linha.get(col_loteca))) if p]
             extras["loteca"] = _parse_loteca(tokens)
 
         # extras embutidos no final de Numeros (T1 T2, JAN, TM12)
@@ -425,3 +429,48 @@ def validar_jogos(
         validos.append(jogo)
 
     return validos, erros
+
+
+def escrever_csv(
+    caminho: str | Path,
+    jogos: list[Jogo],
+    modalidade: Modalidade,
+) -> Path:
+    path = Path(caminho)
+    max_d = max((len(jogo.dezenas)
+                for jogo in jogos), default=modalidade.min_dezenas)
+    campos = ["Jogo"] + [f"D{i}" for i in range(1, max_d + 1)] + ["Numeros"]
+    if modalidade.extra == "mes":
+        campos.append("Mes")
+    if modalidade.extra == "time":
+        campos.append("Time")
+    if modalidade.extra == "trevos":
+        campos.append("Trevos")
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        escritor = csv.DictWriter(handle, fieldnames=campos)
+        escritor.writeheader()
+        for jogo in jogos:
+            ident = jogo.identificador or "".join(
+                f"{n:0{modalidade.largura_digitos}d}" for n in jogo.dezenas
+            )
+            numeros = "".join(
+                f"{n:0{modalidade.largura_digitos}d}" for n in jogo.dezenas
+            )
+            linha: dict[str, object] = {"Jogo": ident, "Numeros": numeros}
+            for i in range(1, max_d + 1):
+                linha[f"D{i}"] = (
+                    f"{jogo.dezenas[i - 1]:0{modalidade.largura_digitos}d}"
+                    if i <= len(jogo.dezenas)
+                    else ""
+                )
+            if modalidade.extra == "mes" and "mes" in jogo.extras:
+                linha["Mes"] = jogo.extras["mes"]
+            if modalidade.extra == "time" and "time" in jogo.extras:
+                linha["Time"] = jogo.extras["time"]
+            if modalidade.extra == "trevos" and "trevos" in jogo.extras:
+                linha["Trevos"] = " ".join(str(t)
+                                           for t in jogo.extras["trevos"])
+            escritor.writerow(linha)
+    return path

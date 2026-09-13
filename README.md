@@ -12,6 +12,26 @@ O pagamento continua sendo feito por você no site oficial. Este programa não e
 
 ## Instalação
 
+Na pasta do projeto:
+
+```bash
+# Linux / macOS
+./install.sh
+
+# Windows (Prompt de Comando ou dois cliques)
+install.bat
+```
+
+Ou, em qualquer sistema com Python 3.10+:
+
+```bash
+python3 install.py
+```
+
+O instalador cria o `.venv`, instala as dependências e baixa o Chromium do Playwright.
+
+Na mão:
+
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate   # Windows: .venv\Scripts\activate
