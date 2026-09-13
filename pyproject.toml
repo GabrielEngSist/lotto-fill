@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "caixa-apostas"
+version = "1.1.0"
+description = "Preenche jogos no Loterias Online da Caixa a partir de um CSV"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "playwright>=1.40.0",
+  "browser-cookie3>=0.19.1",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+caixa-apostas = "caixa_apostas.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["caixa_apostas*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

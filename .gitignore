@@ -1,0 +1,15 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+dist/
+build/
+.cookies
+cookies.txt
+cookies.json
+*.cookies
+screenshots/
+.playwright/
+.DS_Store
