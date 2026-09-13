@@ -4,7 +4,7 @@ from caixa_apostas.cookies import (
     parse_json_cookies,
     parse_netscape,
 )
-from caixa_apostas.modalidades import obter_modalidade
+from caixa_apostas.modalidades import especial_de, obter_modalidade
 
 
 def test_aliases_modalidade():
@@ -12,6 +12,19 @@ def test_aliases_modalidade():
     assert obter_modalidade("loto-facil").chave == "lotofacil"
     assert obter_modalidade("virada").chave == "mega-da-virada"
     assert obter_modalidade("+Milionária").chave == "mais-milionaria"
+    assert obter_modalidade(
+        "lotofacil/especial").chave == "lotofacil-independencia"
+    assert obter_modalidade(
+        "lotofacil-independencia").hash_path == "lotofacil/especial"
+
+
+def test_especial_da_mesma_familia():
+    assert especial_de(obter_modalidade("lotofacil")
+                       ).chave == "lotofacil-independencia"
+    assert especial_de(obter_modalidade("mega-sena")).chave == "mega-da-virada"
+    assert especial_de(obter_modalidade("quina")).chave == "quina-sao-joao"
+    assert especial_de(obter_modalidade("lotofacil-independencia")) is None
+    assert especial_de(obter_modalidade("lotomania")) is None
 
 
 def test_parse_cookie_header():
@@ -42,5 +55,6 @@ def test_carregar_de_arquivo(tmp_path):
     arquivo = tmp_path / "cookies.txt"
     arquivo.write_text("JSESSIONID=token; PATH=/silce-web", encoding="utf-8")
     cookies = carregar_cookies(arquivo=arquivo)
-    assert any(c["name"] == "JSESSIONID" and c["value"] == "token" for c in cookies)
+    assert any(c["name"] == "JSESSIONID" and c["value"]
+               == "token" for c in cookies)
     assert all(c["name"].lower() != "path" for c in cookies)

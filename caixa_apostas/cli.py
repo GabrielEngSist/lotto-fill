@@ -10,6 +10,7 @@ from caixa_apostas import __version__
 from caixa_apostas.concurso import obter_info_concurso
 from caixa_apostas.cookies import carregar_cookies
 from caixa_apostas.csv_parser import ler_csv, validar_jogos
+from caixa_apostas.favorito import nome_favorito_padrao
 from caixa_apostas.modalidades import Modalidade, listar_modalidades, obter_modalidade
 from caixa_apostas.navegador_cookies import buscar_cookies_navegador, listar_sessoes
 
@@ -100,6 +101,20 @@ def montar_parser() -> argparse.ArgumentParser:
         help="pasta para capturas em caso de erro",
     )
     parser.add_argument(
+        "--nome-favorito",
+        help="nome ao salvar o carrinho como favorito (padrão: nome do arquivo CSV)",
+    )
+    parser.add_argument(
+        "--sem-salvar-favorito",
+        action="store_true",
+        help="não salva o carrinho como favorito depois de incluir as apostas",
+    )
+    parser.add_argument(
+        "--apenas-salvar-favorito",
+        action="store_true",
+        help="só salva o carrinho atual como favorito (precisa ter pelo menos uma aposta)",
+    )
+    parser.add_argument(
         "--listar",
         action="store_true",
         help="lista as modalidades e sai",
@@ -176,7 +191,8 @@ def _listar_sessoes(navegador: str) -> int:
 def _carregar_sessao(args) -> list:
     cookies = carregar_cookies(texto=args.cookie, arquivo=args.cookie_arquivo)
     if cookies:
-        print(f"Usando {len(cookies)} cookie(s) informado(s) na linha de comando.")
+        print(
+            f"Usando {len(cookies)} cookie(s) informado(s) na linha de comando.")
         return cookies
 
     if args.sem_cookie_navegador:
@@ -192,7 +208,8 @@ def _carregar_sessao(args) -> list:
             )
         return sessao.cookies
     if sessao and sessao.aviso:
-        print(f"Encontrei o perfil {sessao.navegador}/{sessao.perfil}, mas não li os cookies.")
+        print(
+            f"Encontrei o perfil {sessao.navegador}/{sessao.perfil}, mas não li os cookies.")
         print(f"  {sessao.aviso}")
         print("Dica: feche o navegador e tente de novo, ou use o Firefox.")
     else:
@@ -294,11 +311,12 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     inicio = max(1, args.inicio)
-    selecionados = validos[inicio - 1 :]
+    selecionados = validos[inicio - 1:]
     if args.limite and args.limite > 0:
         selecionados = selecionados[: args.limite]
 
-    _imprimir_preview(selecionados, modalidade)
+    if not args.apenas_salvar_favorito:
+        _imprimir_preview(selecionados, modalidade)
 
     if args.dry_run:
         print()
@@ -322,13 +340,21 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"Cookie inválido: {exc}", file=sys.stderr)
                 return 2
 
-    from caixa_apostas.browser import CaixaBrowser
+    from caixa_apostas.browser import CaixaBrowser, Relatorio
+
+    nome_favorito = nome_favorito_padrao(csv_path, args.nome_favorito)
+    salvar_favorito = not args.sem_salvar_favorito
+    relatorio = Relatorio()
+    erro_favorito = None
 
     print()
-    print(
-        "O script só coloca os jogos no carrinho. "
-        "O pagamento você confirma no próprio site."
-    )
+    if args.apenas_salvar_favorito:
+        print(f"Vou salvar o carrinho atual como favorito: {nome_favorito}")
+    else:
+        print(
+            "O script só coloca os jogos no carrinho. "
+            "O pagamento você confirma no próprio site."
+        )
 
     try:
         with CaixaBrowser(
@@ -342,8 +368,15 @@ def main(argv: list[str] | None = None) -> int:
             manter_aberto=not args.fechar,
         ) as caixa:
             caixa.aguardar_login_manual()
-            caixa.abrir_modalidade()
-            relatorio = caixa.preencher_jogos(selecionados)
+            if not args.apenas_salvar_favorito:
+                caixa.abrir_modalidade()
+                relatorio = caixa.preencher_jogos(selecionados)
+                salvar_favorito = salvar_favorito and bool(relatorio.ok)
+            if salvar_favorito:
+                try:
+                    caixa.salvar_carrinho_favorito(nome_favorito)
+                except Exception as exc:
+                    erro_favorito = exc
     except KeyboardInterrupt:
         print("\nInterrompido.", file=sys.stderr)
         return 130
@@ -351,16 +384,26 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Falha na automação: {exc}", file=sys.stderr)
         return 1
 
-    print()
-    print("Relatório")
-    print("---------")
-    print(f"Incluídos no carrinho: {len(relatorio.ok)}")
-    print(f"Falhas: {len(relatorio.falhas)}")
-    for falha in relatorio.falhas:
-        print(f"  - {falha.identificador}: {falha.detalhe}")
-    if relatorio.ok:
+    if not args.apenas_salvar_favorito:
+        print()
+        print("Relatório")
+        print("---------")
+        print(f"Incluídos no carrinho: {len(relatorio.ok)}")
+        print(f"Falhas: {len(relatorio.falhas)}")
+        for falha in relatorio.falhas:
+            print(f"  - {falha.identificador}: {falha.detalhe}")
+    if erro_favorito:
+        print(
+            f"Não consegui salvar o carrinho como favorito: {erro_favorito}",
+            file=sys.stderr,
+        )
+    elif salvar_favorito:
+        print(f"Carrinho favorito: {nome_favorito}")
+    if relatorio.ok or args.apenas_salvar_favorito:
         print()
         print("Confira o carrinho no navegador antes de pagar.")
+    if erro_favorito:
+        return 1
     return 0 if not relatorio.falhas else 1
 
 

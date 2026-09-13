@@ -1,4 +1,5 @@
 from caixa_apostas.cli import main, perguntar_modalidade
+from caixa_apostas.favorito import nome_favorito_padrao
 
 
 def test_listar_modalidades(capsys):
@@ -49,6 +50,15 @@ def test_dry_run_dia_de_sorte():
         )
         == 0
     )
+
+
+def test_nome_favorito_usa_planilha_ou_flag():
+    assert (
+        nome_favorito_padrao("~/Downloads/Lotofacil_163_apostas_otimizadas.csv")
+        == "Lotofacil_163_apostas_otimizadas"
+    )
+    assert nome_favorito_padrao("jogos.csv", "  Meu Carrinho  ") == "Meu Carrinho"
+    assert nome_favorito_padrao("jogos.csv", "") == "jogos"
 
 
 def test_csv_ausente():

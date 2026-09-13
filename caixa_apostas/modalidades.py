@@ -241,9 +241,13 @@ _ALIASES = {
     "mega da virada": "mega-da-virada",
     "virada": "mega-da-virada",
     "lotofacil da independencia": "lotofacil-independencia",
+    "lotofacil independencia": "lotofacil-independencia",
+    "lotofacil especial": "lotofacil-independencia",
     "independencia": "lotofacil-independencia",
     "quina de sao joao": "quina-sao-joao",
+    "quina especial": "quina-sao-joao",
     "sao joao": "quina-sao-joao",
+    "mega sena especial": "mega-da-virada",
 }
 
 
@@ -264,11 +268,22 @@ def obter_modalidade(identificador: str) -> Modalidade:
         if _normalizar(modalidade.nome) == _normalizar(identificador):
             return modalidade
     opcoes = ", ".join(m.chave for m in MODALIDADES)
-    raise ValueError(f"Modalidade desconhecida: {identificador!r}. Use uma de: {opcoes}")
+    raise ValueError(
+        f"Modalidade desconhecida: {identificador!r}. Use uma de: {opcoes}")
 
 
 def listar_modalidades() -> tuple[Modalidade, ...]:
     return MODALIDADES
+
+
+def especial_de(modalidade: Modalidade) -> Modalidade | None:
+    """Concurso especial da mesma família (Lotofácil → Independência, etc.)."""
+    if modalidade.especial:
+        return None
+    for candidata in MODALIDADES:
+        if candidata.especial and candidata.api_slug == modalidade.api_slug:
+            return candidata
+    return None
 
 
 MESES = {

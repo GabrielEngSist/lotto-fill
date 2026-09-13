@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+import sys
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
 
 from caixa_apostas.csv_parser import Jogo
-from caixa_apostas.modalidades import Modalidade
+from caixa_apostas.modalidades import Modalidade, especial_de
 
 URL_HOME = "https://www.loteriasonline.caixa.gov.br/silce-web/#/"
 
@@ -125,6 +126,27 @@ JS_CLICK_MENU = r"""
 }
 """
 
+JS_ESPECIAL_LISTADO = r"""
+({menuId, hashPath, nome}) => {
+  const visivel = (el) => Boolean(el && el.offsetParent !== null);
+  const direto = document.getElementById(menuId);
+  if (visivel(direto)) return true;
+  const alvoHash = String(hashPath || "").toLowerCase();
+  const alvoNome = String(nome || "").toLowerCase();
+  const els = document.querySelectorAll("#menuPrincipal a, a[id], a[href], button");
+  for (const el of els) {
+    if (!visivel(el)) continue;
+    const id = (el.id || "").toLowerCase();
+    const href = (el.getAttribute("href") || "").toLowerCase();
+    const txt = (el.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
+    if (id === String(menuId).toLowerCase()) return true;
+    if (alvoHash && href.includes(alvoHash)) return true;
+    if (alvoNome && txt && (txt === alvoNome || txt.includes(alvoNome))) return true;
+  }
+  return false;
+}
+"""
+
 JS_DISMISS_DIALOGS = r"""
 () => {
   const clickEl = (el) => {
@@ -164,12 +186,174 @@ JS_GAME_LENGTH = r"""
 
 JS_LOGADO = r"""
 () => {
-  const txt = (document.body && document.body.innerText) || "";
-  if (/sair|meus pedidos|carrinho/i.test(txt) && !/identifique-se/i.test(txt)) {
-    return true;
+  const visivel = (el) => {
+    if (!el) return false;
+    const st = window.getComputedStyle(el);
+    if (st.display === "none" || st.visibility === "hidden") return false;
+    return el.getClientRects().length > 0;
+  };
+  if (visivel(document.getElementById("salvarcarrinhofavorito"))) return true;
+  const sairEl =
+    document.getElementById("sair") ||
+    document.querySelector("a[href*='sair'], a[ng-click*='sair'], a[href*='logout']");
+  if (visivel(sairEl)) return true;
+  const textos = Array.from(document.querySelectorAll("a, button")).map((el) => ({
+    t: ((el.innerText || el.textContent || "") + "").replace(/\s+/g, " ").trim(),
+    visivel: visivel(el),
+  }));
+  const tem = (re) => textos.some((x) => x.visivel && re.test(x.t));
+  if (tem(/^sair\b/i) || tem(/meus pedidos/i)) return true;
+  const user = document.querySelector(
+    ".nome-usuario, .usuario-logado, [class*='usuario-logado']"
+  );
+  if (visivel(user) && (user.textContent || "").trim()) return true;
+  if (tem(/^identifique-se$/i) || tem(/^acessar$/i) || tem(/^entrar$/i)) {
+    return false;
   }
-  const user = document.querySelector(".nome-usuario, .usuario-logado, [class*='logado']");
-  return Boolean(user);
+  return false;
+}
+"""
+
+JS_CLICK_TEXTO = r"""
+({ids, padroes, maxLen}) => {
+  const clickEl = (el) => {
+    if (!el) return false;
+    try { el.scrollIntoView({block: "center", inline: "nearest"}); } catch (e) {}
+    if (window.angular) {
+      try { angular.element(el).click(); return true; } catch (e) {}
+    }
+    try { el.click(); return true; } catch (e) {}
+    return false;
+  };
+  for (const id of ids || []) {
+    const el = document.getElementById(id);
+    if (el && clickEl(el)) return id;
+  }
+  const re = (padroes || []).map((p) => new RegExp(p, "i"));
+  const limite = maxLen || 80;
+  const els = document.querySelectorAll("a, button, input[type='button'], [ng-click], span");
+  for (const el of els) {
+    if (el.offsetParent === null) continue;
+    const t = ((el.innerText || el.value || el.getAttribute("title") || "") + "")
+      .replace(/\s+/g, " ").trim();
+    if (!t || t.length > limite) continue;
+    if (re.some((r) => r.test(t)) && clickEl(el)) return t;
+  }
+  return false;
+}
+"""
+
+JS_PREENCHER_NOME_FAVORITO = r"""
+(nome) => {
+  const visivel = (el) => Boolean(el && el.offsetParent !== null);
+  const setValue = (el, value) => {
+    el.focus();
+    el.value = value;
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+    el.dispatchEvent(new Event("change", { bubbles: true }));
+    if (window.angular) {
+      try {
+        const ae = angular.element(el);
+        ae.val(value);
+        ae.triggerHandler("input");
+        ae.triggerHandler("change");
+      } catch (e) {}
+    }
+  };
+  const raiz =
+    document.querySelector(".modal.in, .modal.show, .modal[style*='display: block']") ||
+    document.querySelector(".modal-dialog") ||
+    document;
+  const inputs = raiz.querySelectorAll(
+    "input[type='text'], input:not([type]), input[type='search'], textarea"
+  );
+  for (const el of inputs) {
+    if (!visivel(el) || el.disabled) continue;
+    setValue(el, nome);
+    return el.id || el.name || "input";
+  }
+  return false;
+}
+"""
+
+JS_DISMISS_COOKIES = r"""
+() => {
+  const clickEl = (el) => {
+    if (!el) return false;
+    if (window.angular) {
+      try { angular.element(el).click(); return true; } catch (e) {}
+    }
+    el.click();
+    return true;
+  };
+  const ids = ["onetrust-accept-btn-handler", "acceptAllButton", "onetrust-accept-btn"];
+  for (const id of ids) {
+    const el = document.getElementById(id);
+    if (el && el.offsetParent !== null && clickEl(el)) return id;
+  }
+  const botoes = document.querySelectorAll("button, a");
+  for (const el of botoes) {
+    if (el.offsetParent === null) continue;
+    const t = ((el.innerText || el.value || "") + "").replace(/\s+/g, " ").trim();
+    if (/^aceitar$/i.test(t) && clickEl(el)) return t;
+  }
+  return false;
+}
+"""
+
+JS_CARRINHO_TEM_APOSTA = r"""
+() => {
+  const txt = ((document.body && document.body.innerText) || "").replace(/\s+/g, " ");
+  if (/n[aã]o\s+(fez\s+)?nenhuma\s+aposta|carrinho\s+(est[aá]\s+)?vazio/i.test(txt)) {
+    return false;
+  }
+  const badge = document.querySelector(
+    "#carrinho .badge, .carrinho-qtd, [class*='qtd-carrinho'], [class*='contador-carrinho'], a[href*='carrinho'] .badge"
+  );
+  if (badge) {
+    const n = parseInt((badge.innerText || "").replace(/\D/g, ""), 10);
+    if (!Number.isNaN(n)) return n > 0;
+  }
+  const itens = document.querySelectorAll(
+    "[ng-repeat*='carrinho'], [ng-repeat*='aposta'], .item-carrinho, [id^='aposta'], [class*='item-carrinho']"
+  );
+  if (itens.length > 0) return true;
+  const acoes = Array.from(document.querySelectorAll("a, button, [ng-click]"));
+  for (const el of acoes) {
+    if (el.offsetParent === null) continue;
+    const t = ((el.innerText || "") + "").replace(/\s+/g, " ").trim();
+    if (/excluir/i.test(t) || /salvar\s+carrinho\s+como\s+favorito/i.test(t)) {
+      return true;
+    }
+  }
+  return false;
+}
+"""
+
+JS_CLICK_SALVAR_MODAL = r"""
+() => {
+  const clickEl = (el) => {
+    if (!el) return false;
+    if (window.angular) {
+      try { angular.element(el).click(); return true; } catch (e) {}
+    }
+    try { el.click(); return true; } catch (e) {}
+    return false;
+  };
+  const visivel = (el) => Boolean(el && el.offsetParent !== null);
+  const raizes = document.querySelectorAll(
+    ".modal.in, .modal.show, .modal[style*='display: block'], .modal-dialog"
+  );
+  const lista = raizes.length ? raizes : [document];
+  for (const raiz of lista) {
+    const botoes = raiz.querySelectorAll("button, a, input[type='button'], [ng-click]");
+    for (const el of botoes) {
+      if (!visivel(el)) continue;
+      const t = ((el.innerText || el.value || "") + "").replace(/\s+/g, " ").trim();
+      if (/^salvar$/i.test(t) && clickEl(el)) return t;
+    }
+  }
+  return false;
 }
 """
 
@@ -255,7 +439,8 @@ class CaixaBrowser:
 
     def fechar(self) -> None:
         if self.manter_aberto and not self.headless and self._browser:
-            self.log("Navegador permanece aberto para você conferir o carrinho e pagar.")
+            self.log(
+                "Navegador permanece aberto para você conferir o carrinho e pagar.")
             return
         try:
             if self._context:
@@ -271,8 +456,7 @@ class CaixaBrowser:
             self.page = None
 
     def aguardar_login_manual(self, input_fn: Callable[[str], str] | None = None) -> None:
-        if self.parece_logado():
-            self.log("Sessão autenticada detectada.")
+        if self._esperar_logado(tentativas=6, intervalo_ms=700):
             return
         self.log(
             "Sessão não detectada. Faça login na janela do navegador "
@@ -283,11 +467,62 @@ class CaixaBrowser:
                 "Não há sessão logada e o modo --headless não permite login manual. "
                 "Passe --cookie / --cookie-arquivo ou rode sem --headless."
             )
+        if input_fn is None and not sys.stdin.isatty():
+            self.log("Sem terminal para confirmar; aguardando login na janela…")
+            if self._esperar_logado(tentativas=40, intervalo_ms=1000):
+                return
+            self.log("Login não confirmado; seguindo com os cookies aplicados.")
+            return
         perguntar = input_fn or input
         perguntar("Pressione Enter depois de entrar na sua conta… ")
         self.page.reload(wait_until="domcontentloaded")
         self.page.wait_for_timeout(1200)
         self._dispensar_dialogs()
+
+    def aguardar_login_para_salvar(
+        self,
+        *,
+        forcar: bool = False,
+        input_fn: Callable[[str], str] | None = None,
+    ) -> None:
+        if self.parece_logado() and not forcar:
+            return
+        self.log(
+            "Faça login na janela do navegador para salvar o carrinho como favorito."
+        )
+        if self.headless:
+            raise RuntimeError(
+                "Não há sessão logada e o modo --headless não permite login "
+                "para salvar o carrinho. Rode sem --headless."
+            )
+        perguntar = input_fn or input
+        while True:
+            if input_fn is None and not sys.stdin.isatty():
+                self.log("Aguardando login na janela…")
+                if self._esperar_logado(tentativas=300, intervalo_ms=1000):
+                    return
+                raise RuntimeError(
+                    "Login não confirmado; não foi possível salvar o carrinho."
+                )
+            perguntar("Pressione Enter depois de entrar na sua conta… ")
+            self.page.wait_for_timeout(800)
+            self._dispensar_dialogs()
+            self._dispensar_cookies()
+            if self.parece_logado() or self._tem_botao_salvar_favorito():
+                self.log("Sessão autenticada detectada.")
+                return
+            self.log(
+                "Ainda não detectei o login. Entre na conta e pressione Enter de novo."
+            )
+
+    def _esperar_logado(self, *, tentativas: int, intervalo_ms: int) -> bool:
+        for _ in range(tentativas):
+            if self.parece_logado():
+                self.log("Sessão autenticada detectada.")
+                return True
+            self.page.wait_for_timeout(intervalo_ms)
+            self._dispensar_dialogs()
+        return False
 
     def parece_logado(self) -> bool:
         try:
@@ -296,27 +531,132 @@ class CaixaBrowser:
             return False
 
     def abrir_modalidade(self) -> None:
-        url = URL_HOME + self.modalidade.hash_path
-        self.log(f"Abrindo {self.modalidade.nome}: {url}")
-        clicou = False
-        try:
-            clicou = bool(self.page.evaluate(JS_CLICK_MENU, self.modalidade.menu_id))
-        except Exception as exc:
-            self.log(f"Menu não clicável ({exc}); navegando direto pelo endereço.")
-        if not clicou:
-            self.page.goto(url, wait_until="domcontentloaded")
+        original = self.modalidade
+        especial = especial_de(original)
+        if especial and self._especial_listado(especial):
+            self.log(
+                f"Concurso especial listado na tela: {especial.nome}. "
+                f"Abrindo {especial.hash_path} em vez de {original.hash_path}."
+            )
+            candidatos = (especial, original)
+        elif especial:
+            candidatos = (original, especial)
+        else:
+            candidatos = (original,)
+
+        for i, candidata in enumerate(candidatos):
+            self.modalidade = candidata
+            self._navegar_modalidade(candidata)
+            espera = (
+                self.timeout_ms
+                if i == len(candidatos) - 1
+                else min(8_000, self.timeout_ms)
+            )
+            if self._tem_volante(timeout_ms=espera):
+                return
+            if i < len(candidatos) - 1:
+                proxima = candidatos[i + 1]
+                self.log(
+                    f"Volante de {candidata.nome} não apareceu; "
+                    f"tentando {proxima.nome} em {proxima.hash_path}."
+                )
+
+        self._screenshot("volante-nao-encontrado")
+        raise RuntimeError(
+            "Não encontrei o volante. Confira se a modalidade está disponível "
+            "e se a sessão ainda está válida."
+        )
+
+    def _navegar_modalidade(self, modalidade: Modalidade) -> None:
+        url = URL_HOME + modalidade.hash_path
+        self.log(f"Abrindo {modalidade.nome}: {url}")
+        self.page.goto(url, wait_until="domcontentloaded")
         self.page.wait_for_timeout(1800)
         self._dispensar_dialogs()
-        self._esperar_volante()
+        clicou = False
+        try:
+            clicou = bool(self.page.evaluate(
+                JS_CLICK_MENU, modalidade.menu_id))
+        except Exception as exc:
+            self.log(
+                f"Menu não clicável ({exc}); endereço direto já foi aberto.")
+        if clicou:
+            self.page.wait_for_timeout(800)
+            self._dispensar_dialogs()
+
+    def salvar_carrinho_favorito(self, nome: str) -> None:
+        nome = (nome or "").strip()
+        if not nome:
+            raise RuntimeError("informe um nome para o carrinho favorito")
+        self.log(f"Salvando carrinho como favorito '{nome}'.")
+        self._abrir_carrinho()
+        if not self._esperar_carrinho_com_aposta():
+            self._screenshot("carrinho-vazio")
+            raise RuntimeError(
+                "O carrinho está vazio. Inclua pelo menos uma aposta "
+                "antes de salvar como favorito."
+            )
+
+        if not self._clicar_salvar_carrinho_favorito():
+            self.aguardar_login_para_salvar()
+            self._abrir_carrinho()
+            for tentativa in range(1, 6):
+                if not self._esperar_carrinho_com_aposta():
+                    self._screenshot("carrinho-vazio")
+                    raise RuntimeError(
+                        "O carrinho está vazio. Inclua pelo menos uma aposta "
+                        "antes de salvar como favorito."
+                    )
+                if self._clicar_salvar_carrinho_favorito():
+                    break
+                self._screenshot("carrinho-salvar-favorito")
+                self.log(
+                    "Não achei o botão #salvarcarrinhofavorito. "
+                    "Faça login na janela e pressione Enter para tentar de novo "
+                    f"({tentativa}/5)."
+                )
+                self.aguardar_login_para_salvar(forcar=True)
+                self._abrir_carrinho()
+            else:
+                raise RuntimeError(
+                    "Não achei o botão #salvarcarrinhofavorito. "
+                    "Confira se a sessão está logada."
+                )
+
+        self.page.wait_for_timeout(800)
+        campo = self.page.evaluate(JS_PREENCHER_NOME_FAVORITO, nome)
+        if not campo:
+            self._screenshot("modal-favorito-nome")
+            raise RuntimeError(
+                "Não achei o campo de nome no modal de favorito.")
+
+        self.page.wait_for_timeout(300)
+        salvou = bool(self.page.evaluate(JS_CLICK_SALVAR_MODAL))
+        if not salvou:
+            self._screenshot("modal-favorito-salvar")
+            raise RuntimeError(
+                "Não achei o botão Salvar no modal de favorito.")
+
+        self.page.wait_for_timeout(1500)
+        self.log(f"Carrinho salvo como favorito: {nome}")
+
+    def _abrir_carrinho(self) -> None:
+        url = URL_HOME + "carrinho"
+        self.log(f"Abrindo carrinho: {url}")
+        self.page.goto(url, wait_until="domcontentloaded")
+        self.page.wait_for_timeout(1500)
+        self._dispensar_cookies()
 
     def preencher_jogos(self, jogos: list[Jogo]) -> Relatorio:
         relatorio = Relatorio()
         total = len(jogos)
         for i, jogo in enumerate(jogos, start=1):
-            self.log(f"[{i}/{total}] {jogo.identificador} → {jogo.dezenas_formatadas(self.modalidade.largura_digitos)}")
+            self.log(
+                f"[{i}/{total}] {jogo.identificador} → {jogo.dezenas_formatadas(self.modalidade.largura_digitos)}")
             try:
                 self._preencher_um(jogo)
-                relatorio.registrar(jogo.identificador, True, "adicionado ao carrinho")
+                relatorio.registrar(jogo.identificador, True,
+                                    "adicionado ao carrinho")
             except Exception as exc:
                 detalhe = str(exc)
                 self.log(f"  falhou: {detalhe}")
@@ -337,15 +677,18 @@ class CaixaBrowser:
         elif self.modalidade.extra == "colunas":
             self._ajustar_tamanho(len(jogo.dezenas))
             for col, n in enumerate(jogo.dezenas, start=1):
-                ok = self.page.evaluate(JS_CLICK_NUMERO_COLUNA, {"col": col, "n": n})
+                ok = self.page.evaluate(
+                    JS_CLICK_NUMERO_COLUNA, {"col": col, "n": n})
                 if not ok:
-                    raise RuntimeError(f"não achei o dígito {n} na coluna {col}")
+                    raise RuntimeError(
+                        f"não achei o dígito {n} na coluna {col}")
         else:
             self._ajustar_tamanho(len(jogo.dezenas))
             for n in jogo.dezenas:
                 ok = self.page.evaluate(JS_CLICK_NUMERO, n)
                 if not ok:
-                    raise RuntimeError(f"não achei a dezena {n:02d} no volante")
+                    raise RuntimeError(
+                        f"não achei a dezena {n:02d} no volante")
 
         if self.teimosinha:
             for _ in range(self.teimosinha):
@@ -396,7 +739,8 @@ class CaixaBrowser:
             mes,
         )
         if not ok:
-            raise RuntimeError(f"não achei o mês {mes} no carrossel do Dia de Sorte")
+            raise RuntimeError(
+                f"não achei o mês {mes} no carrossel do Dia de Sorte")
 
     def _marcar_time(self, time_n: int) -> None:
         ok = self.page.evaluate(
@@ -412,7 +756,8 @@ class CaixaBrowser:
             time_n,
         )
         if not ok:
-            raise RuntimeError(f"não achei o time {time_n} no carrossel da Timemania")
+            raise RuntimeError(
+                f"não achei o time {time_n} no carrossel da Timemania")
 
     def _marcar_trevos(self, trevos: list[int]) -> None:
         extra = max(0, len(trevos) - 2)
@@ -460,15 +805,73 @@ class CaixaBrowser:
         except Exception:
             ok = False
         if not ok and obrigatorio:
-            raise RuntimeError(f"elemento #{element_id} não encontrado na página")
+            raise RuntimeError(
+                f"elemento #{element_id} não encontrado na página")
 
     def _dispensar_dialogs(self) -> None:
         try:
             self.page.evaluate(JS_DISMISS_DIALOGS)
         except Exception:
             pass
+        self._dispensar_cookies()
 
-    def _esperar_volante(self) -> None:
+    def _dispensar_cookies(self) -> None:
+        try:
+            self.page.evaluate(JS_DISMISS_COOKIES)
+        except Exception:
+            pass
+
+    def _carrinho_tem_aposta(self) -> bool:
+        try:
+            return bool(self.page.evaluate(JS_CARRINHO_TEM_APOSTA))
+        except Exception:
+            return False
+
+    def _esperar_carrinho_com_aposta(self, tentativas: int = 8) -> bool:
+        for _ in range(tentativas):
+            self._dispensar_cookies()
+            if self._carrinho_tem_aposta():
+                return True
+            self.page.wait_for_timeout(400)
+        return False
+
+    def _tem_botao_salvar_favorito(self) -> bool:
+        try:
+            loc = self.page.locator("#salvarcarrinhofavorito")
+            return loc.count() > 0 and loc.first.is_visible()
+        except Exception:
+            return False
+
+    def _clicar_salvar_carrinho_favorito(self) -> bool:
+        try:
+            loc = self.page.locator("#salvarcarrinhofavorito")
+            loc.first.wait_for(state="visible", timeout=2500)
+            loc.first.scroll_into_view_if_needed()
+            loc.first.click()
+            return True
+        except Exception:
+            pass
+        try:
+            return bool(self.page.evaluate(JS_CLICK_EL, "salvarcarrinhofavorito"))
+        except Exception:
+            return False
+
+    def _especial_listado(self, especial: Modalidade) -> bool:
+        try:
+            return bool(
+                self.page.evaluate(
+                    JS_ESPECIAL_LISTADO,
+                    {
+                        "menuId": especial.menu_id,
+                        "hashPath": especial.hash_path,
+                        "nome": especial.nome,
+                    },
+                )
+            )
+        except Exception:
+            return False
+
+    def _tem_volante(self, timeout_ms: int | None = None) -> bool:
         try:
             self.page.wait_for_function(
                 """() => Boolean(
@@ -477,20 +880,27 @@ class CaixaBrowser:
                     document.getElementById("n1") ||
                     document.querySelector("a.loteca_palpite")
                 )""",
-                timeout=self.timeout_ms,
+                timeout=timeout_ms or self.timeout_ms,
             )
+            return True
         except Exception:
-            self._screenshot("volante-nao-encontrado")
-            raise RuntimeError(
-                "Não encontrei o volante. Confira se a modalidade está disponível "
-                "e se a sessão ainda está válida."
-            )
+            return False
+
+    def _esperar_volante(self) -> None:
+        if self._tem_volante():
+            return
+        self._screenshot("volante-nao-encontrado")
+        raise RuntimeError(
+            "Não encontrei o volante. Confira se a modalidade está disponível "
+            "e se a sessão ainda está válida."
+        )
 
     def _screenshot(self, nome: str) -> None:
         if not self.screenshots or not self.page:
             return
         self.screenshots.mkdir(parents=True, exist_ok=True)
-        seguro = "".join(ch if ch.isalnum() or ch in "-_" else "_" for ch in nome)[:80]
+        seguro = "".join(ch if ch.isalnum()
+                         or ch in "-_" else "_" for ch in nome)[:80]
         caminho = self.screenshots / f"{seguro}.png"
         try:
             self.page.screenshot(path=str(caminho), full_page=True)
