@@ -39,7 +39,10 @@ async function carregar() {
     btn.style.borderColor = m.cor;
     btn.style.color = m.cor;
     btn.style.background = "#fff";
-    btn.title = m.descricao_faixa;
+    btn.setAttribute(
+      "data-tip",
+      `${m.nome}: ${m.descricao_faixa}. Clique para escolher. Trocar de concurso esvazia o carrinho.`,
+    );
     btn.addEventListener("click", () => escolher(m.chave));
     nav.appendChild(btn);
   }
@@ -88,14 +91,18 @@ function desenharExtras() {
   box.innerHTML = "";
   const extra = estado.modalidade.extra;
   if (extra === "mes") {
-    box.innerHTML = `<label class="rotulo">Mês da sorte</label>
+    box.innerHTML = `<label class="rotulo">Mês da sorte
+        <span class="tip" tabindex="0" data-tip="Obrigatório no Dia de Sorte, além das 7 dezenas. Escolha o mês que vai no volante.">?</span></label>
       <select id="mes">${MESES.map((n, i) => `<option value="${i + 1}">${n}</option>`).join("")}</select>
       <p class="ajuda">Obrigatório no Dia de Sorte, além das dezenas.</p>`;
   } else if (extra === "time") {
-    box.innerHTML = `<label class="rotulo">Time do coração (1 a 80)</label>
-      <input id="time" type="number" min="1" max="80" value="1">`;
+    box.innerHTML = `<label class="rotulo">Time do coração (1 a 80)
+        <span class="tip" tabindex="0" data-tip="Número do time na tabela oficial da Timemania, de 1 a 80. Vai junto com as 10 dezenas.">?</span></label>
+      <input id="time" type="number" min="1" max="80" value="1" data-tip="Use o código do time (1 a 80), não o nome.">`;
   } else if (extra === "trevos") {
-    box.innerHTML = `<p class="rotulo">Trevos (escolha 2)</p><div id="trevos" class="bolas"></div>`;
+    box.innerHTML = `<p class="rotulo">Trevos (escolha 2)
+      <span class="tip" tabindex="0" data-tip="A +Milionária pede 2 trevos de 1 a 6, além das 6 dezenas. Clique em dois números.">?</span></p>
+      <div id="trevos" class="bolas"></div>`;
     const t = $("trevos");
     for (let n = 1; n <= 6; n += 1) {
       const b = document.createElement("button");
@@ -126,7 +133,8 @@ function desenharBolas() {
   box.innerHTML = "";
   const m = estado.modalidade;
   if (m.extra === "colunas" || m.extra === "loteca") {
-    box.innerHTML = `<p class="ajuda">Neste concurso não há volante de bolinhas. Importe uma planilha ou use Mais jogos.</p>`;
+    box.innerHTML = `<p class="ajuda">Neste concurso não há volante de bolinhas. Importe uma planilha CSV ou use Mais jogos, se a Surpresinha estiver disponível.
+      <span class="tip" tabindex="0" data-tip="Super Sete usa colunas de dígitos e Loteca usa 1, X ou 2. O jeito mais simples é importar um CSV no formato do programa.">?</span></p>`;
     return;
   }
   for (let n = m.dezena_min; n <= m.dezena_max; n += 1) {
@@ -134,7 +142,6 @@ function desenharBolas() {
     b.type = "button";
     b.className = "bola";
     b.textContent = pad(n, m.largura_digitos);
-    b.title = `Marcar ou desmarcar a dezena ${pad(n, m.largura_digitos)}`;
     b.addEventListener("click", () => toggle(n));
     box.appendChild(b);
   }
@@ -502,6 +509,191 @@ $("btn-simular").addEventListener("click", () => simular().catch((e) => alert(e)
 $("btn-planilha").addEventListener("click", () => baixarPlanilha().catch((e) => alert(e)));
 $("btn-enviar").addEventListener("click", () => enviar().catch((e) => alert(e)));
 
+const TUTORIAL_PASSOS = [
+  {
+    titulo: "Escolha o concurso",
+    html: `
+      <p>As bolinhas coloridas no topo são os concursos da Caixa. Clique em um: Lotofácil, Mega-Sena, Quina…</p>
+      <p>A escolhida inverte as cores (fundo colorido, texto branco). As outras ficam com fundo branco e a cor da própria borda.</p>
+      <div class="tutorial-exemplo">
+        <strong>Exemplo</strong>
+        Clique em <b>Lotofácil</b> para marcar 15 números de 01 a 25. Se mudar para Mega-Sena, o carrinho some — os números de um concurso não valem no outro.
+      </div>`,
+  },
+  {
+    titulo: "Monte um jogo",
+    html: `
+      <p>Três jeitos de preencher o volante:</p>
+      <ul>
+        <li>Clique nas bolinhas até completar a quantidade.</li>
+        <li>Digite os números e aperte <b>Marcar</b>.</li>
+        <li><b>Surpresinha</b> escolhe ao acaso. Confira e só depois coloque no carrinho.</li>
+      </ul>
+      <div class="tutorial-exemplo">
+        <strong>Exemplo Lotofácil</strong>
+        Campo “Dezenas neste jogo” = 15.<br>
+        Digite: <code>01 05 07 09 11 12 15 16 18 20 21 22 23 24 25</code> e clique em Marcar.
+      </div>
+      <p>No Dia de Sorte escolha o mês; na Timemania, o time; na +Milionária, 2 trevos.</p>`,
+  },
+  {
+    titulo: "Coloque no carrinho",
+    html: `
+      <p>Com o volante completo, clique em <b>Colocar no carrinho</b>. As bolinhas limpam para o próximo jogo. Repita quantas vezes quiser.</p>
+      <p>Já tem planilha? Use <b>Importar CSV</b>. O cabeçalho esperado é <code>Jogo, D1, D2, …, Numeros</code> (vírgula ou ponto e vírgula do Excel).</p>
+      <div class="tutorial-exemplo">
+        <strong>Super Sete e Loteca</strong>
+        Não há volante de bolinhas. Importe um CSV ou, se aparecer, use <b>Mais jogos</b>.
+      </div>`,
+  },
+  {
+    titulo: "Nome, Teimosinha e cotas",
+    html: `
+      <ul>
+        <li><b>Nome do carrinho</b> — como o favorito aparece no site da Caixa.</li>
+        <li><b>Teimosinha</b> — 0 = só este sorteio. 2 = este e os dois seguintes (o preço × 3).</li>
+        <li><b>Cotas</b> — só divide o valor na tela. A Caixa cobra o total do grupo.</li>
+      </ul>
+      <div class="tutorial-exemplo">
+        <strong>Exemplo de bolão</strong>
+        Dois jogos de Lotofácil (R$ 3,50 cada) = R$ 7,00. Com 2 cotas, cada pessoa fica com <b>R$ 3,50</b>.<br>
+        Se Teimosinha = 2, o total vira R$ 21,00 e cada cota R$ 10,50.
+      </div>`,
+  },
+  {
+    titulo: "Simule ou baixe a planilha",
+    html: `
+      <p><b>Simular chances</b> mostra no rodapé o preço e a probabilidade de algum prêmio. Não envia nada à Caixa.</p>
+      <p><b>Gerar planilha</b> baixa um CSV para guardar ou reimportar depois.</p>
+      <div class="tutorial-exemplo">
+        <strong>Opcional: Mais jogos</strong>
+        “Gerar e colocar” com 5 jogos de 15 dezenas cria 5 Surpresinhas de uma vez. “Completar até 10” enche o carrinho até essa quantidade.
+      </div>`,
+  },
+  {
+    titulo: "Envie ao site da Caixa",
+    html: `
+      <p><b>Enviar ao site da Caixa</b> abre o Loterias Online e marca os jogos no carrinho oficial.</p>
+      <ul>
+        <li>Faça login no site da Caixa no seu Chrome, Edge ou Firefox antes.</li>
+        <li>O pagamento (Pix, cartão) é só no site oficial. Este programa não cobra.</li>
+        <li>Confira o carrinho no navegador que abrir antes de pagar.</li>
+      </ul>
+      <div class="tutorial-exemplo">
+        <strong>Se algo falhar</strong>
+        A caixa preta no rodapé mostra o andamento. Você pode gerar a planilha e tentar de novo.
+      </div>`,
+  },
+  {
+    titulo: "Como encerrar",
+    html: `
+      <p><b>Feche esta aba</b> para desligar o aplicativo. Trocar de aba ou atualizar a página (F5) não fecha.</p>
+      <p>Passe o mouse (ou toque no <b>?</b>) em qualquer campo para ver a dica daquela função. Este tutorial reabre no botão amarelo <b>Como usar</b>.</p>
+      <div class="tutorial-exemplo">
+        <strong>Resumo</strong>
+        Concurso → volante ou CSV → carrinho → cotas/Teimosinha → simular → enviar → pagar no site da Caixa.
+      </div>`,
+  },
+];
+
+let tutorialIndice = 0;
+
+function posicionarDica(el) {
+  const bolha = $("dica-bolha");
+  const r = el.getBoundingClientRect();
+  const b = bolha.getBoundingClientRect();
+  let top = r.top - b.height - 10;
+  if (top < 8) top = r.bottom + 10;
+  let left = r.left + r.width / 2 - b.width / 2;
+  left = Math.max(8, Math.min(left, window.innerWidth - b.width - 8));
+  bolha.style.top = `${top}px`;
+  bolha.style.left = `${left}px`;
+}
+
+function mostrarDica(el) {
+  const texto = el.getAttribute("data-tip");
+  if (!texto || !$("tutorial").hidden) return;
+  const bolha = $("dica-bolha");
+  bolha.textContent = texto;
+  bolha.hidden = false;
+  posicionarDica(el);
+}
+
+function esconderDica() {
+  $("dica-bolha").hidden = true;
+}
+
+function alvoDica(ev) {
+  return ev.target.closest?.("[data-tip]") || null;
+}
+
+document.addEventListener("pointerover", (ev) => {
+  const el = alvoDica(ev);
+  if (el) mostrarDica(el);
+});
+document.addEventListener("pointerout", (ev) => {
+  const el = alvoDica(ev);
+  if (!el) return;
+  if (el.contains(ev.relatedTarget)) return;
+  esconderDica();
+});
+document.addEventListener("focusin", (ev) => {
+  if (ev.target.classList.contains("tip")) mostrarDica(ev.target);
+});
+document.addEventListener("focusout", () => esconderDica());
+window.addEventListener("scroll", esconderDica, true);
+
+function pintarTutorial() {
+  const passo = TUTORIAL_PASSOS[tutorialIndice];
+  $("tutorial-indice").textContent = `Passo ${tutorialIndice + 1} de ${TUTORIAL_PASSOS.length}`;
+  $("tutorial-titulo").textContent = passo.titulo;
+  $("tutorial-corpo").innerHTML = passo.html;
+  $("tutorial-voltar").disabled = tutorialIndice === 0;
+  $("tutorial-seguir").textContent =
+    tutorialIndice === TUTORIAL_PASSOS.length - 1 ? "Concluir" : "Próximo";
+}
+
+function abrirTutorial(inicio = 0) {
+  tutorialIndice = inicio;
+  esconderDica();
+  $("tutorial").hidden = false;
+  pintarTutorial();
+  $("tutorial-seguir").focus();
+}
+
+function fecharTutorial() {
+  $("tutorial").hidden = true;
+  try {
+    localStorage.setItem("lottofill-viu-tutorial", "1");
+  } catch (_err) {
+    /* modo privado */
+  }
+  $("btn-tutorial").focus();
+}
+
+$("btn-tutorial").addEventListener("click", () => abrirTutorial(0));
+$("tutorial-pular").addEventListener("click", fecharTutorial);
+$("tutorial-voltar").addEventListener("click", () => {
+  if (tutorialIndice > 0) {
+    tutorialIndice -= 1;
+    pintarTutorial();
+  }
+});
+$("tutorial-seguir").addEventListener("click", () => {
+  if (tutorialIndice >= TUTORIAL_PASSOS.length - 1) {
+    fecharTutorial();
+    return;
+  }
+  tutorialIndice += 1;
+  pintarTutorial();
+});
+$("tutorial").addEventListener("click", (ev) => {
+  if (ev.target.id === "tutorial") fecharTutorial();
+});
+document.addEventListener("keydown", (ev) => {
+  if (ev.key === "Escape" && !$("tutorial").hidden) fecharTutorial();
+});
+
 function manterAberto() {
   fetch("/api/vivo", { method: "POST", keepalive: true }).catch(() => {});
 }
@@ -513,6 +705,12 @@ window.addEventListener("pagehide", () => {
   navigator.sendBeacon("/api/sair");
 });
 
-carregar().catch((err) => {
+carregar().then(() => {
+  try {
+    if (!localStorage.getItem("lottofill-viu-tutorial")) abrirTutorial(0);
+  } catch (_err) {
+    /* modo privado */
+  }
+}).catch((err) => {
   log(`Erro ao carregar: ${err}`);
 });

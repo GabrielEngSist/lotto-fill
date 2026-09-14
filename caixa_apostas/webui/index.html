@@ -8,12 +8,21 @@
 </head>
 <body>
   <header class="topo">
-    <p class="marca">CAIXA</p>
-    <h1>Loterias Online</h1>
-    <p class="sub">Monte o volante aqui. O pagamento continua no site oficial. Fechar esta aba encerra o aplicativo.</p>
+    <div class="topo-linha">
+      <div>
+        <p class="marca">CAIXA</p>
+        <h1>Loterias Online</h1>
+        <p class="sub">Monte o volante aqui. O pagamento continua no site oficial. Fechar esta aba encerra o aplicativo.</p>
+      </div>
+      <button type="button" class="btn amarelo" id="btn-tutorial" data-tip="Abre o passo a passo com exemplos. Vale a pena na primeira vez.">Como usar</button>
+    </div>
   </header>
   <div class="faixa"></div>
 
+  <p class="ajuda concursos-ajuda">
+    Clique no concurso. A escolhida fica com fundo colorido e texto branco.
+    <span class="tip" tabindex="0" data-tip="Cada bolinha é um concurso da Caixa (Lotofácil, Mega-Sena, Quina…). Trocar de concurso esvazia o carrinho, porque os números de um não valem no outro.">?</span>
+  </p>
   <nav class="concursos" id="concursos" aria-label="Concursos"></nav>
 
   <main class="grade">
@@ -24,35 +33,35 @@
       </div>
 
       <label class="rotulo" for="dez-volante">Dezenas neste jogo
-        <span class="tip" title="Quantos números este volante vai ter. Ex.: 15 na Lotofácil, 16 se quiser um jogo maior.">?</span>
+        <span class="tip" tabindex="0" data-tip="Quantos números este volante vai ter. Na Lotofácil o simples é 15; 16 ou mais custa mais e aumenta a chance. A Surpresinha usa este valor.">?</span>
       </label>
       <p class="ajuda">A Surpresinha usa esta quantidade. O mínimo e o máximo mudam com o concurso.</p>
-      <input id="dez-volante" type="number" min="1" max="50" value="15">
+      <input id="dez-volante" type="number" min="1" max="50" value="15" data-tip="Exemplo na Lotofácil: 15 é o jogo mais barato. 16, 17… até 20 deixam o volante maior.">
 
       <div id="extras" class="extras"></div>
 
-      <div id="bolas" class="bolas" role="group" aria-label="Volante"></div>
+      <div id="bolas" class="bolas" role="group" aria-label="Volante" data-tip="Clique nas bolinhas para marcar. Clique de novo para desmarcar. A frase abaixo diz quantas ainda faltam."></div>
       <p id="status-volante" class="status">Você ainda não marcou nenhuma dezena.</p>
 
       <label class="rotulo" for="digitados">Ou digite os números
-        <span class="tip" title="Separe com espaço. Ex.: 01 05 12 15 18.">?</span>
+        <span class="tip" tabindex="0" data-tip="Cole ou digite as dezenas separadas por espaço, vírgula ou ponto e vírgula. Depois clique em Marcar para pintar o volante.">?</span>
       </label>
-      <p class="ajuda">Exemplo: 01 05 12 15 18 20 21 22 23 24 25</p>
+      <p class="ajuda">Exemplo Lotofácil (15 números): 01 05 07 09 11 12 15 16 18 20 21 22 23 24 25</p>
       <div class="linha">
-        <input id="digitados" type="text" placeholder="01 05 12 15 18">
-        <button type="button" class="btn azul" id="btn-marcar" title="Pinta no volante os números digitados">Marcar</button>
+        <input id="digitados" type="text" placeholder="01 05 12 15 18" data-tip="Aceita 01 05 12 ou 1 5 12. Números fora da faixa do concurso são ignorados.">
+        <button type="button" class="btn azul" id="btn-marcar" data-tip="Pinta no volante os números que você digitou. Substitui a marcação atual.">Marcar</button>
       </div>
 
       <div class="acoes">
-        <button type="button" class="btn azul" id="btn-surpresa" title="Escolhe os números ao acaso neste volante">Surpresinha</button>
-        <button type="button" class="btn claro" id="btn-limpar" title="Apaga as dezenas marcadas">Limpar volante</button>
-        <button type="button" class="btn laranja" id="btn-cart" title="Guarda este jogo no carrinho">Colocar no carrinho</button>
+        <button type="button" class="btn azul" id="btn-surpresa" data-tip="Escolhe as dezenas ao acaso, na quantidade do campo acima. O jogo ainda não vai para o carrinho: confira e clique em Colocar no carrinho.">Surpresinha</button>
+        <button type="button" class="btn claro" id="btn-limpar" data-tip="Apaga as dezenas marcadas neste volante. Os jogos que já estão no carrinho continuam lá.">Limpar volante</button>
+        <button type="button" class="btn laranja" id="btn-cart" data-tip="Guarda o volante atual no carrinho e limpa as bolinhas para o próximo jogo. Dá para repetir várias vezes.">Colocar no carrinho</button>
       </div>
 
       <div class="caixa-csv">
-        <strong>Já tem uma planilha CSV?</strong>
-        <p class="ajuda">Os jogos do arquivo entram direto no carrinho.</p>
-        <label class="btn escuro arquivo">
+        <strong>Já tem uma planilha CSV? <span class="tip" tabindex="0" data-tip="O arquivo precisa das colunas Jogo, D1, D2… e Numeros. O Excel brasileiro (ponto e vírgula) também vale. Super Sete e Loteca entram por aqui.">?</span></strong>
+        <p class="ajuda">Os jogos do arquivo entram direto no carrinho. Cabeçalho: Jogo, D1, D2, …, Numeros.</p>
+        <label class="btn escuro arquivo" data-tip="Lê um CSV da pasta do computador e adiciona os jogos válidos ao carrinho desta modalidade.">
           Importar CSV
           <input id="arquivo-csv" type="file" accept=".csv,.txt" hidden>
         </label>
@@ -62,69 +71,87 @@
     <aside class="card carrinho">
       <div class="faixa-carrinho">
         <h2>Carrinho</h2>
-        <span id="qtd-carrinho">0 jogo(s)</span>
+        <span id="qtd-carrinho" data-tip="Quantos jogos você já guardou para este concurso. Trocar de modalidade esvazia esta lista.">0 jogo(s)</span>
       </div>
 
       <label class="rotulo" for="nome-carrinho">Nome do carrinho
-        <span class="tip" title="Nome que aparece ao salvar o favorito no site da Caixa.">?</span>
+        <span class="tip" tabindex="0" data-tip="Nome do favorito no site da Caixa, se a caixa abaixo estiver marcada. Ex.: Lotofácil Independência — família.">?</span>
       </label>
       <p class="ajuda">Ex.: Lotofácil Independência — família.</p>
-      <input id="nome-carrinho" type="text" value="Meu carrinho">
+      <input id="nome-carrinho" type="text" value="Meu carrinho" data-tip="Aparece no site da Caixa ao salvar o carrinho como favorito.">
 
-      <label class="check">
+      <label class="check" data-tip="Depois de marcar os jogos no site, tenta gravar este carrinho nos favoritos da sua conta Caixa.">
         <input id="salvar-fav" type="checkbox" checked>
         Salvar como favorito no site depois de enviar
       </label>
 
       <label class="rotulo" for="teimosinha">Teimosinha (próximos sorteios)
-        <span class="tip" title="0 = só este sorteio. 2 = este e os dois seguintes.">?</span>
+        <span class="tip" tabindex="0" data-tip="0 = só o concurso atual. 2 = este e os dois seguintes: o preço é multiplicado por 3. Ex.: um jogo de R$ 3,50 com Teimosinha 2 vira R$ 10,50.">?</span>
       </label>
-      <p class="ajuda">0 = só este concurso. 2 = este e os 2 seguintes.</p>
-      <input id="teimosinha" type="number" min="0" max="12" value="0">
+      <p class="ajuda">0 = só este concurso. 2 = este e os 2 seguintes (o valor triplica).</p>
+      <input id="teimosinha" type="number" min="0" max="12" value="0" data-tip="Número de concursos extras. 0 não cobra a mais. 1 cobra o dobro, 2 o triplo, e assim por diante.">
 
       <label class="rotulo" for="cotas">Cotas do bolão
-        <span class="tip" title="Em quantas pessoas o valor total será dividido. 1 = só você.">?</span>
+        <span class="tip" tabindex="0" data-tip="Em quantas pessoas o valor total será dividido. Não muda o que a Caixa cobra: só mostra quanto cada um deve. Ex.: R$ 7,00 em 2 cotas = R$ 3,50 por pessoa.">?</span>
       </label>
       <p class="ajuda">Quantas pessoas entram neste jogo. O valor por pessoa aparece embaixo.</p>
-      <input id="cotas" type="number" min="1" max="100" value="1">
+      <input id="cotas" type="number" min="1" max="100" value="1" data-tip="1 = só você. 4 = o total dividido por quatro pessoas.">
 
-      <p class="rotulo">Jogos no carrinho</p>
-      <ul id="lista-jogos" class="lista"></ul>
+      <p class="rotulo">Jogos no carrinho
+        <span class="tip" tabindex="0" data-tip="Clique em um jogo da lista para selecioná-lo. Depois use Remover selecionado. Esvaziar apaga todos.">?</span>
+      </p>
+      <ul id="lista-jogos" class="lista" data-tip="Clique em uma linha para destacá-la. A linha azul-clara é a selecionada."></ul>
       <div class="linha">
-        <button type="button" class="btn claro" id="btn-remover">Remover selecionado</button>
-        <button type="button" class="btn claro" id="btn-esvaziar">Esvaziar</button>
+        <button type="button" class="btn claro" id="btn-remover" data-tip="Apaga só o jogo destacado na lista. Se nada estiver selecionado, o programa avisa.">Remover selecionado</button>
+        <button type="button" class="btn claro" id="btn-esvaziar" data-tip="Apaga todos os jogos do carrinho, depois de confirmar.">Esvaziar</button>
       </div>
 
       <details class="mais">
-        <summary>Mais jogos (opcional)</summary>
-        <p class="ajuda">Gera vários jogos aleatórios de uma vez, sem marcar o volante.</p>
+        <summary data-tip="Atalho para gerar vários jogos aleatórios de uma vez, sem clicar no volante.">Mais jogos (opcional)</summary>
+        <p class="ajuda">Gera vários jogos aleatórios de uma vez, sem marcar o volante. Ex.: 5 jogos de 15 dezenas.</p>
         <div class="linha">
-          <label>Dezenas <input id="dez-lote" type="number" min="1" max="50" value="15"></label>
-          <label>Jogos <input id="qtd-lote" type="number" min="1" max="500" value="5"></label>
-          <button type="button" class="btn azul" id="btn-lote" title="Cria esses jogos ao acaso e adiciona ao carrinho">Gerar e colocar</button>
+          <label>Dezenas <input id="dez-lote" type="number" min="1" max="50" value="15" data-tip="Quantos números cada jogo gerado terá. Ex.: 15 na Lotofácil."></label>
+          <label>Jogos <input id="qtd-lote" type="number" min="1" max="500" value="5" data-tip="Quantos jogos novos entram no carrinho agora. Ex.: 5."></label>
+          <button type="button" class="btn azul" id="btn-lote" data-tip="Cria esses jogos ao acaso e já coloca no carrinho.">Gerar e colocar</button>
         </div>
         <div class="linha">
-          <label>Completar até <input id="completar" type="number" min="1" max="500" value="10"></label>
-          <button type="button" class="btn azul" id="btn-completar" title="Gera jogos simples até o carrinho chegar nesse número">Completar</button>
+          <label>Completar até <input id="completar" type="number" min="1" max="500" value="10" data-tip="Se o carrinho tem 3 jogos e você pede 10, nascem 7 jogos simples (quantidade mínima da modalidade)."></label>
+          <button type="button" class="btn azul" id="btn-completar" data-tip="Gera jogos simples até o carrinho chegar nesse número.">Completar</button>
         </div>
       </details>
 
-      <div class="total">
+      <div class="total" data-tip="Soma automática dos jogos + Teimosinha. A linha laranja é o valor dividido pelas cotas.">
         <p class="ajuda">Valor total</p>
         <p id="total" class="preco">R$ 0,00</p>
         <p id="por-cota" class="por-cota">1 cota · R$ 0,00 por pessoa</p>
       </div>
 
-      <button type="button" class="btn azul bloco" id="btn-simular" title="Mostra o preço e a chance de ganhar">Simular chances</button>
-      <button type="button" class="btn escuro bloco" id="btn-planilha" title="Baixa um CSV com os jogos do carrinho">Gerar planilha</button>
-      <button type="button" class="btn verde bloco" id="btn-enviar" title="Abre o site oficial e marca os jogos. O pagamento é no site.">Enviar ao site da Caixa</button>
+      <button type="button" class="btn azul bloco" id="btn-simular" data-tip="Mostra no rodapé o preço de cada jogo e a chance de ganhar algum prêmio. Não envia nada à Caixa.">Simular chances</button>
+      <button type="button" class="btn escuro bloco" id="btn-planilha" data-tip="Baixa um CSV com os jogos do carrinho, no mesmo formato que o Importar CSV aceita.">Gerar planilha</button>
+      <button type="button" class="btn verde bloco" id="btn-enviar" data-tip="Abre o site oficial e marca os jogos no carrinho de lá. Você precisa estar logado no Loterias Online. O pagamento (Pix, cartão) é só no site da Caixa.">Enviar ao site da Caixa</button>
     </aside>
   </main>
 
   <footer class="rodape">
-    <p id="passo">Escolha o concurso, marque as dezenas e coloque no carrinho.</p>
-    <pre id="log"></pre>
+    <p id="passo" data-tip="Resumo do que falta fazer. Os detalhes do envio e da simulação aparecem na caixa preta abaixo.">Escolha o concurso, marque as dezenas e coloque no carrinho.</p>
+    <pre id="log" data-tip="Aqui entram avisos, a simulação completa e o andamento do envio ao site da Caixa."></pre>
   </footer>
+
+  <div id="dica-bolha" class="dica-bolha" hidden></div>
+
+  <div id="tutorial" class="tutorial" hidden role="dialog" aria-modal="true" aria-labelledby="tutorial-titulo">
+    <div class="tutorial-caixa">
+      <p class="tutorial-indice" id="tutorial-indice">Passo 1 de 7</p>
+      <h2 id="tutorial-titulo"></h2>
+      <div id="tutorial-corpo" class="tutorial-corpo"></div>
+      <div class="tutorial-nav">
+        <button type="button" class="btn claro" id="tutorial-voltar">Voltar</button>
+        <button type="button" class="btn claro" id="tutorial-pular">Pular</button>
+        <button type="button" class="btn azul" id="tutorial-seguir">Próximo</button>
+      </div>
+    </div>
+  </div>
+
   <script src="/static/app.js"></script>
 </body>
 </html>
