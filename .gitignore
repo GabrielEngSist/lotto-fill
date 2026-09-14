@@ -11,5 +11,6 @@ cookies.txt
 cookies.json
 *.cookies
 screenshots/
+planilhas/
 .playwright/
 .DS_Store

@@ -115,6 +115,17 @@ def chance_conjunto(probs: list[float]) -> float:
     return 1.0 - nenhuma
 
 
+def custo_com_teimosinha(preco_concurso: float, teimosinha: int) -> float:
+    """Teimosinha 0 = só este concurso; 2 = este e os 2 seguintes."""
+    concursos = 1 + max(0, int(teimosinha or 0))
+    return preco_concurso * concursos
+
+
+def valor_por_cota(total: float, cotas: int) -> float:
+    n = max(1, int(cotas or 1))
+    return total / n
+
+
 def formatar_reais(valor: float) -> str:
     centavos = int(round(valor * 100))
     sinal = "-" if centavos < 0 else ""

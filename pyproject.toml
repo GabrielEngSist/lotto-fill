@@ -18,6 +18,10 @@ dev = ["pytest>=8.0"]
 
 [project.scripts]
 caixa-apostas = "caixa_apostas.cli:main"
+lotto-fill = "caixa_apostas.web:main"
+
+[tool.setuptools.package-data]
+caixa_apostas = ["webui/*"]
 
 [tool.setuptools.packages.find]
 include = ["caixa_apostas*"]

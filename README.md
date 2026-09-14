@@ -30,6 +30,25 @@ python3 install.py
 
 O instalador cria o `.venv`, instala as dependências e baixa o Chromium do Playwright.
 
+## Aplicativo (navegador)
+
+Para quem não quer usar o terminal, o Lotto Fill abre no navegador:
+
+```bash
+# depois de instalar
+.venv/bin/python apostas_web.py     # Windows: .venv\Scripts\python apostas_web.py
+
+# ou dois cliques
+LottoFill.command    # macOS / Linux
+LottoFill.bat        # Windows
+```
+
+Dois cliques no ícone **Lotto Fill** (área de trabalho, ou `LottoFill.command` / `LottoFill.bat`) abrem o navegador. **Fechar a aba encerra o aplicativo.**
+
+Na página você escolhe o concurso, marca as dezenas no volante (ou importa um CSV), monta o carrinho, simula o preço e envia os jogos ao site oficial da Caixa. O pagamento continua no site.
+
+O endereço local é `http://127.0.0.1:8765/`.
+
 Na mão:
 
 ```bash

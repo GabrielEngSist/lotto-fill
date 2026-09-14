@@ -13,11 +13,13 @@ from caixa_apostas.gerador import (
 )
 from caixa_apostas.modalidades import obter_modalidade
 from caixa_apostas.simulador import (
+    custo_com_teimosinha,
     formatar_reais,
     hipergeometrica,
     preco_volante,
     probabilidade_faixas,
     simular_jogo,
+    valor_por_cota,
 )
 
 
@@ -123,3 +125,11 @@ def test_escrever_e_ler_csv(tmp_path: Path):
     assert len(validos) == 3
     assert [tuple(j.dezenas) for j in validos] == [
         tuple(j.dezenas) for j in jogos]
+
+
+def test_cotas_e_teimosinha():
+    assert custo_com_teimosinha(7.0, 0) == 7.0
+    assert custo_com_teimosinha(7.0, 2) == 21.0
+    assert valor_por_cota(21.0, 3) == 7.0
+    assert valor_por_cota(10.0, 0) == 10.0
+    assert formatar_reais(valor_por_cota(7.0, 2)) == "R$ 3,50"

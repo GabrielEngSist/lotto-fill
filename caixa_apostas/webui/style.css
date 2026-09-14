@@ -1,0 +1,193 @@
+:root {
+  --azul: #005ca9;
+  --azul-escuro: #003b70;
+  --amarelo: #ffb800;
+  --laranja: #e87722;
+  --verde: #1b7a4e;
+  --fundo: #eef2f6;
+  --card: #ffffff;
+  --texto: #1c2430;
+  --mudo: #5b6775;
+  --bola: #f4f7fb;
+  --borda: #c5d0dc;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; }
+body {
+  font-family: "Segoe UI", Helvetica, Arial, sans-serif;
+  background: var(--fundo);
+  color: var(--texto);
+}
+
+.topo {
+  background: var(--azul);
+  color: #fff;
+  padding: 18px 24px 16px;
+}
+.marca {
+  margin: 0;
+  color: var(--amarelo);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  font-size: 13px;
+}
+.topo h1 { margin: 4px 0 6px; font-size: 28px; }
+.sub { margin: 0; color: #d6e6f5; }
+.faixa { height: 5px; background: var(--amarelo); }
+
+.concursos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 14px 20px;
+}
+.pill {
+  border: 2px solid;
+  background: #fff;
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.pill.ativa { color: #fff; }
+
+.grade {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(280px, 0.8fr);
+  gap: 16px;
+  padding: 0 20px 20px;
+}
+@media (max-width: 900px) {
+  .grade { grid-template-columns: 1fr; }
+}
+
+.card {
+  background: var(--card);
+  border-radius: 12px;
+  padding: 18px;
+  box-shadow: 0 8px 24px rgba(15, 39, 64, 0.08);
+}
+.card-cab h2 { margin: 0 0 4px; }
+.rotulo {
+  display: block;
+  margin-top: 14px;
+  font-weight: 700;
+}
+.ajuda { margin: 4px 0 8px; color: var(--mudo); font-size: 13px; }
+.tip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #d7dee6;
+  color: var(--azul-escuro);
+  font-size: 12px;
+  cursor: help;
+}
+
+select,
+input[type="text"], input[type="number"] {
+  width: 100%;
+  max-width: 280px;
+  border: 1px solid var(--borda);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 16px;
+}
+.linha { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; }
+.linha input[type="text"] { flex: 1; max-width: none; }
+
+.bolas {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(48px, 1fr));
+  gap: 8px;
+  margin: 16px 0;
+}
+.bola {
+  aspect-ratio: 1;
+  border: 2px solid var(--borda);
+  border-radius: 50%;
+  background: var(--bola);
+  color: var(--texto);
+  font-weight: 800;
+  font-size: 15px;
+  cursor: pointer;
+}
+.bola.marcada { color: #fff; border-color: transparent; }
+.status { font-weight: 700; }
+
+.acoes, .caixa-csv { margin-top: 16px; }
+.caixa-csv {
+  background: #f4f7fb;
+  padding: 12px;
+  border-radius: 8px;
+}
+
+.btn {
+  border: 0;
+  border-radius: 8px;
+  padding: 11px 16px;
+  font-weight: 700;
+  cursor: pointer;
+  font-size: 15px;
+}
+.btn.azul { background: var(--azul); color: #fff; }
+.btn.escuro { background: var(--azul-escuro); color: #fff; }
+.btn.laranja { background: var(--laranja); color: #fff; }
+.btn.verde { background: var(--verde); color: #fff; }
+.btn.claro { background: #d7dee6; color: var(--texto); }
+.btn.bloco { width: 100%; margin-top: 8px; }
+.btn.arquivo { display: inline-block; }
+
+.faixa-carrinho {
+  background: var(--laranja);
+  color: #fff;
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.faixa-carrinho h2 { margin: 0; font-size: 20px; }
+.check { display: flex; gap: 8px; align-items: center; margin: 10px 0; }
+.lista {
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+  max-height: 240px;
+  overflow: auto;
+  border: 1px solid var(--borda);
+  border-radius: 8px;
+}
+.lista li { padding: 8px 10px; cursor: pointer; border-bottom: 1px solid #eef2f6; }
+.lista li.sel { background: #e8f1fa; }
+.mais { margin-top: 14px; }
+.mais summary { cursor: pointer; font-weight: 700; }
+.total {
+  background: #f4f7fb;
+  border-radius: 8px;
+  padding: 12px;
+  margin-top: 14px;
+}
+.preco { margin: 0; font-size: 28px; font-weight: 800; color: var(--azul-escuro); }
+.por-cota { margin: 6px 0 0; font-size: 16px; font-weight: 700; color: var(--laranja); }
+
+.rodape {
+  background: var(--azul-escuro);
+  color: #fff;
+  padding: 14px 20px 24px;
+}
+.rodape p { margin: 0 0 8px; font-weight: 700; }
+#log {
+  margin: 0;
+  white-space: pre-wrap;
+  background: #0f2740;
+  color: #e8f1fa;
+  padding: 10px;
+  border-radius: 8px;
+  min-height: 64px;
+  font-size: 13px;
+}
